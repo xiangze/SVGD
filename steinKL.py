@@ -1,23 +1,22 @@
-
-import Edward as ed
+import edward as ed
 import tensorflow as tf
+import six
 
 from edward.inferences.klpq import KLpq
 from edward.models import RandomVariable
 from edward.util import copy, get_descendants
 
 class steinKLpq(KLpq):
-  def __init__(self, latent_vars=None, data=None,kern,dkern=None):
+  def __init__(self, kern,dkern=None,latent_vars=None, data=None,autoscale=False):
+      super(steinKLpq, self).__init__(latent_vars, data)
       self.kern=kern
       if(dkern==None):
           self.dkern,_ = tf.gradients(kern, tf.all_variable())
       else:
           self.dkern=dkern
 
-      super(steinKLpq, self).__init__(latent_vars, data)
-
-  def _gram(self,input):
-        return tf.map_fn(self.kern,input)
+  def _gram(self,kern,input):
+        return tf.map_fn(kern,input)
 
   def build_loss_and_gradients(self, var_list):
     p_log_prob = [0.0] * self.n_samples
@@ -79,8 +78,8 @@ class steinKLpq(KLpq):
     p_vars = [v for v in var_list if v not in q_vars]
 
     p_log_prob_grads = tf.gradients(p_log_prob, p_vars)
-    dx=tf.reduce_sum( tf.matmul(_gram(kern,p_log_prob),p_log_prob_grads) + _gram(dkern(p_log_prob)))
-    p_grads = tf.gradients(-loss, p_vars)*dx
+    dx=tf.reduce_sum( tf.matmul(self._gram(self.kern,p_log_prob),p_log_prob_grads) + self._gram(self.dkern,p_log_prob))
+    p_grads = tf.gradients(-loss,p_vars)*dx
 
     grads_and_vars = list(zip(q_grads, q_vars)) + list(zip(p_grads, p_vars))
     return loss, grads_and_vars
