@@ -7,7 +7,7 @@ from edward.models import RandomVariable
 from edward.util import copy, get_descendants
 
 class steinKLpq(KLpq):
-  def __init__(self, kern,dkern=None,latent_vars=None, data=None,autoscale=False):
+  def __init__(self, kern,dkern=None,latent_vars=None, data=None,autoscale=False,n_sample=10):
       super(steinKLpq, self).__init__(latent_vars, data)
       self.kern=kern
       if(dkern==None):
@@ -15,8 +15,14 @@ class steinKLpq(KLpq):
       else:
           self.dkern=dkern
 
+      self.n_sample=n_sample      
+
   def _gram(self,kern,input):
-        return tf.map_fn(kern,input)
+    i=tf.stack([input]*self.n_sample)   
+    j=tf.concat([input]*self.n_sample)   
+    ii=tf.stack(i,j)
+    ii=tf.reshape(ii,[n_samples,n_samples,2])
+    return tf.map_fn(lambda x: kern(x[0],x[1]),ii)
 
   def build_loss_and_gradients(self, var_list):
     p_log_prob = [0.0] * self.n_samples
